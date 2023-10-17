@@ -1,0 +1,154 @@
+buildscript {
+    repositories {
+        maven {
+            name = "forge"
+            url = "https://files.minecraftforge.net/maven"
+        }
+        maven {
+            name = 'sponge'
+            url = 'https://repo.spongepowered.org/maven'
+        }
+        jcenter()
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
+        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
+    }
+}
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'org.spongepowered.mixin'
+//Only edit below this line, the above code adds and enables the necessary things for Forge to be setup.
+
+
+version = "0.11.2-1.12.2"
+group = "com.mrcrayfish" // http://maven.apache.org/guides/mini/guide-naming-conventions.html
+archivesBaseName = "controllable"
+
+sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8'
+
+mixin {
+    add sourceSets.main, "controllable.refmap.json"
+}
+
+minecraft {
+    mappings channel: 'snapshot', version: '20180814-1.12'
+
+    accessTransformer = file('src/main/resources/controllable_at.cfg')
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'debug'
+            property 'fml.coreMods.load', 'com.mrcrayfish.controllable.asm.ControllablePlugin'
+            arg "-mixin.config=controllable.mixins.json"
+            mods {
+                controllable {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            property 'forge.logging.console.level', 'debug'
+            arg "-mixin.config=controllable.mixins.json"
+            mods {
+                controllable {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    jcenter()
+    maven {
+        // location of the maven that hosts JEI files
+        name = "Progwml6 maven"
+        url = "https://dvs1.progwml6.com/files/maven/"
+    }
+    maven {
+        // location of a maven mirror for JEI files, as a fallback
+        name = "ModMaven"
+        url = "https://modmaven.k-4u.nl"
+    }
+    maven {
+        name = 'sponge'
+        url = 'https://repo.spongepowered.org/maven'
+    }
+}
+
+configurations {
+    embed
+    compile.extendsFrom(embed)
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.12.2-14.23.5.2854'
+    embed "uk.co.electronstudio.sdl2gdx:sdl2gdx:1.0.4"
+    embed('org.spongepowered:mixin:0.8') {
+        exclude module: 'launchwrapper'
+        exclude module: 'guava'
+        exclude module: 'gson'
+        exclude module: 'commons-io'
+    }
+    annotationProcessor 'org.spongepowered:mixin:0.8:processor'
+    implementation ("net.minecraftforge:mergetool:0.2.3.3") { force = true }
+}
+
+jar {
+    manifest {
+        attributes([
+            "Specification-Title": "Controllable",
+            "Specification-Vendor": "MrCrayfish",
+            "Specification-Version": "1",
+            "Implementation-Title": project.name,
+            "Implementation-Version": "${version}",
+            "Implementation-Vendor" :"MrCrayfish",
+            "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+            "Signing-Fingerprint": project.hasProperty('fingerprint') ? project.property('fingerprint') : 'unsigned',
+            "MixinConfigs" : "controllable.mixins.json",
+            "FMLAT": "controllable_at.cfg",
+            "FMLCorePlugin": "com.mrcrayfish.controllable.asm.ControllablePlugin",
+            "FMLCorePluginContainsFMLMod": "true",
+            "TweakClass": "org.spongepowered.asm.launch.MixinTweaker",
+            "TweakOrder": 0,
+            "ForceLoadAsMod": true
+        ])
+    }
+
+    from configurations.embed.collect {
+        exclude 'META-INF/LICENSE.txt'
+        exclude 'META-INF/LICENSE'
+        exclude 'META-INF/NOTICE.txt'
+        exclude 'META-INF/NOTICE'
+        it.isDirectory() ? it : zipTree(it)
+    }
+}
+
+Properties keyStoreProperties = new Properties()
+File file = new File("C:\\dev\\keystore.properties")
+if(file.exists()) {
+    InputStream ins = new FileInputStream(file)
+    keyStoreProperties.load(ins)
+    ins.close()
+}
+
+import net.minecraftforge.gradle.common.task.SignJar
+
+task signJar(type: SignJar, dependsOn: jar) {
+    onlyIf {
+        keyStoreProperties.containsKey("keyStore")
+    }
+    keyStore = keyStoreProperties.get('keyStore')
+    alias = keyStoreProperties.get('alias')
+    storePass = keyStoreProperties.get('keyPass')
+    keyPass = keyStoreProperties.get('storePass')
+    inputFile = jar.archivePath
+    outputFile = jar.archivePath
+}
+build.dependsOn signJar
